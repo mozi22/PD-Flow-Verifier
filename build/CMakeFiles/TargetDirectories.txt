@@ -1,0 +1,4 @@
+/misc/student/muazzama/thesis-sceneflow-verify/build/CMakeFiles/rebuild_cache.dir
+/misc/student/muazzama/thesis-sceneflow-verify/build/CMakeFiles/edit_cache.dir
+/misc/student/muazzama/thesis-sceneflow-verify/build/CMakeFiles/Scene-Flow-Impair.dir
+/misc/student/muazzama/thesis-sceneflow-verify/build/CMakeFiles/pdflow_cudalib.dir

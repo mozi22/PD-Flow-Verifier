@@ -1,0 +1,2 @@
+/usr/bin/ar qc libpdflow_cudalib.a  CMakeFiles/pdflow_cudalib.dir/pdflow_cudalib_generated_pdflow_cudalib.cu.o
+/usr/bin/ranlib libpdflow_cudalib.a
