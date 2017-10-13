@@ -468,7 +468,8 @@ double PD_flow_opencv::interpolatePixelRGB(std::vector< cv::Mat > finalPixel2D,c
 			continue;
 		}
 
-
+		cout << "pixel2D x = " << pixel2D.at<double>(0,0) << endl;
+		cout << "pixel2D y = " << pixel2D.at<double>(1,0) << endl;
 		/* select top left pixel rgb Q12 */
 		int Q12_X = floor(pixel2D.at<double>(0,0));
 		int Q12_Y = floor(pixel2D.at<double>(1,0));
@@ -490,7 +491,12 @@ double PD_flow_opencv::interpolatePixelRGB(std::vector< cv::Mat > finalPixel2D,c
 		cv::Vec3f Q11RGB = intensity2.at<cv::Vec3f>(Q11_X,Q11_Y);
 		cv::Vec3f Q21RGB = intensity2.at<cv::Vec3f>(Q21_X,Q21_Y);
 
-
+		// if(row == 2 && col == 207){
+		// 	cout << "R values Q11 = " << Q11RGB[0] << endl;
+		// 	cout << "R values Q12 = " << Q12RGB[0] << endl;
+		// 	cout << "R values Q22 = " << Q22RGB[0] << endl;
+		// 	cout << "R values Q21 = " << Q21RGB[0] << endl;
+		// }
 
 		// applying interpolation for RGB
 		double r_value = bilinearInterpolation(Q11RGB[0],Q12RGB[0],Q21RGB[0],Q22RGB[0],Q11_X,Q22_X,Q11_Y,Q22_Y,pixel2D.at<double>(0,0),pixel2D.at<double>(1,0));
@@ -504,13 +510,16 @@ double PD_flow_opencv::interpolatePixelRGB(std::vector< cv::Mat > finalPixel2D,c
 
 		finalImage.at<cv::Vec3b>(cv::Point(row,col)) = color;
 
+
 		if(col == 240){
 			row++;
 			col = 0;		
 		}
+		cout << "row = " << row << " col = " << col << endl;
 
 		col++;
 	}
+		cout << "printing image" << endl;
 
 	cv::namedWindow( "Display window", cv::WINDOW_AUTOSIZE );
 	cv::imshow( "Display window", finalImage );
