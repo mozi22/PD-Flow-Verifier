@@ -43,11 +43,18 @@ PD_flow_opencv::PD_flow_opencv(unsigned int rows_config,
 	const char *depth_filename_2,
 	const char* output_filename_root) {
 
-	cout << "coming here" << endl;
 
-	double m[9] = {570.342, 0, 320, 0, 570.342, 240, 0, 0, 1};
-	camera_intrinsics = cv::Mat(3, 3, CV_64FC1, &m);
+	double m[9] = {570.342/2, 0, 320/2, 0, 570.342/2, 240/2, 0, 0, 1};
+	camera_intrinsics = cv::Mat(3, 3, CV_64FC1);//, &m);
 
+	int l =0;
+	for(int i=0; i < 3; i++)
+		for(int j=0; j < 3; j++,l++)
+			camera_intrinsics.at<double>(i,j) = m[l];
+
+
+	cout << "camera_intrinsic" << camera_intrinsics << endl;
+	cout << "camera_intrinsic_inv" << camera_intrinsics.inv() << endl;
 
 
  //    rows = rows_config;      //Maximum size of the coarse-to-fine scheme - Default 240 (QVGA)
@@ -92,20 +99,20 @@ PD_flow_opencv::PD_flow_opencv(unsigned int rows_config,
 }
 
 
-// void PD_flow_opencv::createImagePyramidGPU()
-// {
-//     //Copy new frames to the scene flow object
-//     csf_host.copyNewFrames(I, Z);
+void PD_flow_opencv::createImagePyramidGPU()
+{
+    //Copy new frames to the scene flow object
+    csf_host.copyNewFrames(I, Z);
 
-//     //Copy scene flow object to device
-//     csf_device = ObjectToDevice(&csf_host);
+    //Copy scene flow object to device
+    csf_device = ObjectToDevice(&csf_host);
 
-//     unsigned int pyr_levels = static_cast<unsigned int>(log2(float(width/cols))) + ctf_levels;
-//     GaussianPyramidBridge(csf_device, pyr_levels, cam_mode);
+    unsigned int pyr_levels = static_cast<unsigned int>(log2(float(width/cols))) + ctf_levels;
+    GaussianPyramidBridge(csf_device, pyr_levels, cam_mode);
 
-//     //Copy scene flow object back to host
-//     BridgeBack(&csf_host, csf_device);
-// }
+    //Copy scene flow object back to host
+    BridgeBack(&csf_host, csf_device);
+}
 
 /*void PD_flow_opencv::solveSceneFlowGPU()
 {
@@ -187,25 +194,25 @@ PD_flow_opencv::PD_flow_opencv(unsigned int rows_config,
 //     csf_host.freeDeviceMemory();
 // }
 
-// void PD_flow_opencv::initializeCUDA()
-// {
-// 	//Read one image to know the image resolution
-// 	intensity1 = cv::imread(intensity_filename_1, CV_LOAD_IMAGE_GRAYSCALE);
+void PD_flow_opencv::initializeCUDA()
+{
+	//Read one image to know the image resolution
+	intensity1 = cv::imread(intensity_filename_1, CV_LOAD_IMAGE_GRAYSCALE);
 
-// 	width = intensity1.cols;
-// 	height = intensity1.rows;
-// 	if (height == 240) {cam_mode = 2;}
-// 	else			   {cam_mode = 1;}
+	height = intensity1.rows;
+	width = intensity1.cols;
+	if (height == 240) {cam_mode = 2;}
+	else			   {cam_mode = 1;}
 
-// 	I = (float *) malloc(sizeof(float)*width*height);
-// 	Z = (float *) malloc(sizeof(float)*width*height);   
+	I = (float *) malloc(sizeof(float)*width*height);
+	Z = (float *) malloc(sizeof(float)*width*height);   
 	
-// 	//Read parameters
-//     csf_host.readParameters(rows, cols, lambda_i, lambda_d, mu, g_mask, ctf_levels, cam_mode, fovh, fovv);
+	//Read parameters
+    csf_host.readParameters(rows, cols, lambda_i, lambda_d, mu, g_mask, ctf_levels, cam_mode, fovh, fovv);
 
-//     //Allocate memory
-//     csf_host.allocateDevMemory();
-// }
+    //Allocate memory
+    csf_host.allocateDevMemory();
+}
 
 // void PD_flow_opencv::showImages()
 // {
@@ -236,6 +243,7 @@ bool PD_flow_opencv::loadRGBDFrames()
 {
 	cv::Mat depth_float;
 
+
 	//First intensity image
 	intensity1 = cv::imread(intensity_filename_1, CV_LOAD_IMAGE_GRAYSCALE);
 	if (intensity1.empty())
@@ -243,8 +251,9 @@ bool PD_flow_opencv::loadRGBDFrames()
 		printf("\nThe first intensity image (%s) cannot be found, please check that it is in the correct folder \n", intensity_filename_1);
 		return 0;
 	}
-	intensity1 = resizeImage(intensity1);
+	intensity1 = resizeImage(intensity1,cv::INTER_AREA);
 
+	cv::imshow( "Display window0", intensity1 );
 
 	// for (unsigned int u=0; u<width; u++)
 	// 	for (unsigned int v=0; v<height; v++)
@@ -258,9 +267,9 @@ bool PD_flow_opencv::loadRGBDFrames()
 		return 0;
 	}
 
-	depth1 = resizeImage(depth1);
 	depth1.convertTo(depth_float, CV_32FC1, 1.0 / 5000.0);
-
+	depth1 = depth_float;
+	depth1 = resizeImage(depth1,cv::INTER_NEAREST);
 
 
 	// cout<< "depth image cols = " << depth1.cols << endl;
@@ -271,12 +280,13 @@ bool PD_flow_opencv::loadRGBDFrames()
 	// 		Z[v + u*height] = depth_float.at<float>(v,u);
 
 	// createImagePyramidGPU();
+
 	std::vector< cv::Mat > pixel3D = projectImagePxTo3D(intensity1,depth1);
 
-	// now we add sceneflow from file
+	// // now we add sceneflow from file
 	pixel3D = applySceneFlowTo3DWorldPixels(pixel3D);
 
-	// project the matrix back to 2D.
+	// // project the matrix back to 2D.
 	pixel3D = projectBackTo2D(pixel3D);
 
 	// writeTxt(pixel3D);
@@ -290,12 +300,14 @@ bool PD_flow_opencv::loadRGBDFrames()
 		return 0;
 	}
 
-	intensity2 = resizeImage(intensity2);
+	intensity2 = resizeImage(intensity2,cv::INTER_AREA);
+	interpolatePixelRGB(pixel3D,intensity2);
+	// intensity2 = resizeImage(intensity2);
 	// for (unsigned int v=0; v<height; v++)
 	// 	for (unsigned int u=0; u<width; u++)
 	// 		I[v + u*height] = float(intensity2.at<unsigned char>(v,u));
 
-	interpolatePixelRGB(pixel3D,intensity2);
+	// interpolatePixelRGB(pixel3D,intensity2);
 
 	//Second depth image
 	depth2 = cv::imread(depth_filename_2, -1);
@@ -304,7 +316,6 @@ bool PD_flow_opencv::loadRGBDFrames()
 		printf("\nThe second depth image (%s) cannot be found, please check that they are in the correct folder \n", depth_filename_2);
 		return 0;
 	}
-	depth1 = resizeImage(depth2);
 	depth2.convertTo(depth_float, CV_32FC1, 1.0 / 5000.0);
 	// for (unsigned int v=0; v<height; v++)
 	// 	for (unsigned int u=0; u<width; u++)
@@ -313,39 +324,40 @@ bool PD_flow_opencv::loadRGBDFrames()
 	// createImagePyramidGPU();
 	// cv::Mat img23D = projectImagePxTo3D(intensity2);
 
+	cout << "hogya" << endl;
 	return 1;
 }
 
 // Create the image
-cv::Mat PD_flow_opencv::createImage() const
-{
-	//Save scene flow as an RGB image (one colour per direction)
-	cv::Mat sf_image(rows, cols, CV_8UC3);
+// cv::Mat PD_flow_opencv::createImage() const
+// {
+// 	//Save scene flow as an RGB image (one colour per direction)
+// 	cv::Mat sf_image(rows, cols, CV_8UC3);
 
-    //Compute the max values of the flow (of its components)
-	float maxmodx = 0.f, maxmody = 0.f, maxmodz = 0.f;
-	for (unsigned int v=0; v<rows; v++)
-		for (unsigned int u=0; u<cols; u++)
-		{
-            if (fabs(dxp[v + u*rows]) > maxmodx)
-                maxmodx = fabs(dxp[v + u*rows]);
-            if (fabs(dyp[v + u*rows]) > maxmody)
-                maxmody = fabs(dyp[v + u*rows]);
-            if (fabs(dzp[v + u*rows]) > maxmodz)
-                maxmodz = fabs(dzp[v + u*rows]);
-		}
+//     //Compute the max values of the flow (of its components)
+// 	float maxmodx = 0.f, maxmody = 0.f, maxmodz = 0.f;
+// 	for (unsigned int v=0; v<rows; v++)
+// 		for (unsigned int u=0; u<cols; u++)
+// 		{
+//             if (fabs(dxp[v + u*rows]) > maxmodx)
+//                 maxmodx = fabs(dxp[v + u*rows]);
+//             if (fabs(dyp[v + u*rows]) > maxmody)
+//                 maxmody = fabs(dyp[v + u*rows]);
+//             if (fabs(dzp[v + u*rows]) > maxmodz)
+//                 maxmodz = fabs(dzp[v + u*rows]);
+// 		}
 
-	//Create an RGB representation of the scene flow estimate: 
-	for (unsigned int v=0; v<rows; v++)
-		for (unsigned int u=0; u<cols; u++)
-		{
-            sf_image.at<cv::Vec3b>(v,u)[0] = static_cast<unsigned char>(255.f*fabs(dxp[v + u*rows])/maxmodx); //Blue - x
-            sf_image.at<cv::Vec3b>(v,u)[1] = static_cast<unsigned char>(255.f*fabs(dyp[v + u*rows])/maxmody); //Green - y
-            sf_image.at<cv::Vec3b>(v,u)[2] = static_cast<unsigned char>(255.f*fabs(dzp[v + u*rows])/maxmodz); //Red - z
-		}
+// 	//Create an RGB representation of the scene flow estimate: 
+// 	for (unsigned int v=0; v<rows; v++)
+// 		for (unsigned int u=0; u<cols; u++)
+// 		{
+//             sf_image.at<cv::Vec3b>(v,u)[0] = static_cast<unsigned char>(255.f*fabs(dxp[v + u*rows])/maxmodx); //Blue - x
+//             sf_image.at<cv::Vec3b>(v,u)[1] = static_cast<unsigned char>(255.f*fabs(dyp[v + u*rows])/maxmody); //Green - y
+//             sf_image.at<cv::Vec3b>(v,u)[2] = static_cast<unsigned char>(255.f*fabs(dzp[v + u*rows])/maxmodz); //Red - z
+// 		}
 	
-	return sf_image;
-}
+// 	return sf_image;
+// }
 
 /**
  * Save results without displaying them
@@ -415,21 +427,16 @@ void PD_flow_opencv::writeTxt(std::vector< cv::Mat > finalPixel2D){
 	//Format: (pixel(row), pixel(col), vx, vy, vz)
 	for (unsigned int v=0; v<finalPixel2D.size(); v++)
 	{
+		index_y = v / 320;
+		index_x = v- index_y*320;
 		cv::Mat pixel2D = finalPixel2D[v];
 
-		f_res << index_x << " ";
 		f_res << index_y << " ";
+		f_res << index_x << " ";
 		f_res << pixel2D.at<double>(0,0) << " ";
 		f_res << pixel2D.at<double>(1,0) << " ";
 		f_res << pixel2D.at<double>(2,0) << std::endl;
 
-
-		if(index_y == 240){
-			index_x++;
-			index_y = 0;		
-		}
-
-		index_y++;
 	}
 
 	f_res.close();
@@ -452,24 +459,28 @@ double PD_flow_opencv::bilinearInterpolation(double q11,double q12,double q21,do
 	return ((y2 - y)/(y2-y1))*r1 + ((y-y1)/(y2-y1))*r2;
 }
 
+// step 4
 double PD_flow_opencv::interpolatePixelRGB(std::vector< cv::Mat > finalPixel2D,cv::Mat intensity2){
 
 	cv::Mat finalImage(240,320, CV_8UC3, cv::Scalar(0,0,255));
 	int row = 0;
 	int col = 0;
 
-	for(int i=0;i<finalPixel2D.size(); i++){
+	for(int row = 0; row < finalImage.rows; ++row)
+		for(int col = 0; col < finalImage.cols; ++col)
+		{
+			int i = row*finalImage.cols + col;
 
+	
 		cv::Mat pixel2D = finalPixel2D[i];
 
 		// if both the pixel values are 0 or one of them is nan. just move to the next one.
 		if((pixel2D.at<double>(0,0) == 0 && pixel2D.at<double>(1,0) == 0) ||
 			isnan(pixel2D.at<double>(0,0)) ==  1 || isnan(pixel2D.at<double>(1,0)) ==  1){
-			continue;
+			finalImage.at<cv::Vec3b>(row,col) = cv::Vec3b(0,255,0);
+			//continue;
 		}
 
-		cout << "pixel2D x = " << pixel2D.at<double>(0,0) << endl;
-		cout << "pixel2D y = " << pixel2D.at<double>(1,0) << endl;
 		/* select top left pixel rgb Q12 */
 		int Q12_X = floor(pixel2D.at<double>(0,0));
 		int Q12_Y = floor(pixel2D.at<double>(1,0));
@@ -486,10 +497,19 @@ double PD_flow_opencv::interpolatePixelRGB(std::vector< cv::Mat > finalPixel2D,c
 		int Q21_X = ceil(pixel2D.at<double>(0,0));
 		int Q21_Y = ceil(pixel2D.at<double>(1,0));
 
+		if(Q12_X >= 0 && Q21_X < 320 && Q12_Y >= 0 && Q21_Y < 240){}
+		else{
+			finalImage.at<cv::Vec3b>(row,col) = cv::Vec3b(255,0,0); //blue
+			continue;
+			
+		}
+
 		cv::Vec3f Q12RGB = intensity2.at<cv::Vec3f>(Q12_X,Q12_Y);
 		cv::Vec3f Q22RGB = intensity2.at<cv::Vec3f>(Q22_X,Q22_Y);
 		cv::Vec3f Q11RGB = intensity2.at<cv::Vec3f>(Q11_X,Q11_Y);
 		cv::Vec3f Q21RGB = intensity2.at<cv::Vec3f>(Q21_X,Q21_Y);
+		cv::Vec3f tmp = intensity2.at<cv::Vec3b>(Q21_X,Q21_Y);
+		unsigned char tmp2 = intensity2.at<unsigned char>(Q21_Y,Q21_X);
 
 		// if(row == 2 && col == 207){
 		// 	cout << "R values Q11 = " << Q11RGB[0] << endl;
@@ -499,31 +519,40 @@ double PD_flow_opencv::interpolatePixelRGB(std::vector< cv::Mat > finalPixel2D,c
 		// }
 
 		// applying interpolation for RGB
-		double r_value = bilinearInterpolation(Q11RGB[0],Q12RGB[0],Q21RGB[0],Q22RGB[0],Q11_X,Q22_X,Q11_Y,Q22_Y,pixel2D.at<double>(0,0),pixel2D.at<double>(1,0));
-		double g_value = bilinearInterpolation(Q11RGB[1],Q12RGB[1],Q21RGB[1],Q22RGB[1],Q11_X,Q22_X,Q11_Y,Q22_Y,pixel2D.at<double>(0,0),pixel2D.at<double>(1,0));
-		double b_value = bilinearInterpolation(Q11RGB[2],Q12RGB[2],Q21RGB[2],Q22RGB[2],Q11_X,Q22_X,Q11_Y,Q22_Y,pixel2D.at<double>(0,0),pixel2D.at<double>(1,0));
+		// double r_value = bilinearInterpolation(Q11RGB[0],Q12RGB[0],Q21RGB[0],Q22RGB[0],Q11_X,Q22_X,Q11_Y,Q22_Y,pixel2D.at<double>(0,0),pixel2D.at<double>(1,0));
+		// double g_value = bilinearInterpolation(Q11RGB[1],Q12RGB[1],Q21RGB[1],Q22RGB[1],Q11_X,Q22_X,Q11_Y,Q22_Y,pixel2D.at<double>(0,0),pixel2D.at<double>(1,0));
+		// double b_value = bilinearInterpolation(Q11RGB[2],Q12RGB[2],Q21RGB[2],Q22RGB[2],Q11_X,Q22_X,Q11_Y,Q22_Y,pixel2D.at<double>(0,0),pixel2D.at<double>(1,0));
+		cout << row << "  " << col << "\n";
+		cv::Vec3b color;// = finalImage.at<cv::Vec3b>(row,col);
+		color[0] = Q21RGB[0];
+		color[1] = Q21RGB[1];
+		color[2] = Q21RGB[2];
 
-		cv::Vec3b color = finalImage.at<cv::Vec3b>(cv::Point(row,col));
-		color[0] = r_value;
-		color[1] = g_value;
-		color[2] = b_value;
+		
+		color[0] = tmp[0];
+		color[1] = tmp[0];
+		color[2] = tmp[0];
+		color[0] = tmp2;
+		color[1] = tmp2;
+		color[2] = tmp2;
 
-		finalImage.at<cv::Vec3b>(cv::Point(row,col)) = color;
+		finalImage.at<cv::Vec3b>(row,col) = color;
 
 
-		if(col == 240){
-			row++;
-			col = 0;		
-		}
-		cout << "row = " << row << " col = " << col << endl;
+		// col++;
 
-		col++;
+		// if(col == 240){
+		// 	row++;
+		// 	col = 0;		
+		// }
+
 	}
 		cout << "printing image" << endl;
 
 	cv::namedWindow( "Display window", cv::WINDOW_AUTOSIZE );
 	cv::imshow( "Display window", finalImage );
-
+	cv::imshow( "Display window2", intensity2 );
+	cv::waitKey(0);
 }
 
 // step 2
@@ -538,12 +567,33 @@ std::vector< cv::Mat > PD_flow_opencv::applySceneFlowTo3DWorldPixels(std::vector
 	{
 		cv::Mat item = pixel3D[i];
 
+
+		if(item.at<double>(0,0) != 0 && item.at<double>(1,0) != 0 && item.at<double>(2,0) != 0){
+			// cout << "before sceneflow = matrix = " << pixel3D[i] << endl;
+			// cout << "depth before = " << item.at<double>(2,0) << endl;
+			// cout << "sceneflowX before = " << sceneflowX <<endl;
+			// cout << "sceneflowY before = " << sceneflowY <<endl;
+			// cout << "sceneflowZ before = " << sceneflowZ <<endl;
+	
+		}
+
 		item.at<double>(0,0) = item.at<double>(0,0) + sceneflowX;
 		item.at<double>(1,0) = item.at<double>(1,0) + sceneflowY;
 		item.at<double>(2,0) = item.at<double>(2,0) + sceneflowZ;
 
 
+
 		pixel3D[i] = item;
+
+		if(item.at<double>(0,0) != 0){
+			// cout << "sceneflowX = " << sceneflowX <<endl;
+			// cout << "sceneflowY = " << sceneflowY <<endl;
+			// cout << "sceneflowZ = " << sceneflowZ <<endl;
+	
+			// cout << "depth after = " << item.at<double>(2,0) << endl;
+
+			// cout << "after sceneflow = matrix = " << pixel3D[i] << endl;
+		}
 		i++;
 	}
 
@@ -571,20 +621,21 @@ std::vector< cv::Mat > PD_flow_opencv::projectBackTo2D(std::vector< cv::Mat > pi
 
 
 
-cv::Mat PD_flow_opencv::resizeImage(cv::Mat image){
+cv::Mat PD_flow_opencv::resizeImage(cv::Mat image, int interpolation){
 
 	cv::Mat dst;
 
-	cv::resize(image, dst, cv::Size(320,240));
+	cv::resize(image, dst, cv::Size(320,240),0,0,interpolation);
 
 	return dst;
 }
 
-
 // step 1
 std::vector< cv::Mat > PD_flow_opencv::projectImagePxTo3D(cv::Mat image, cv::Mat depth_image)
 {
+	cout << "inv in function " << this->camera_intrinsics.inv() << endl;
 
+	cv::Mat inv_cam_intr = camera_intrinsics.inv();
 	std::vector< cv::Mat > pixel3D;
 
 	for(int i=0;i<image.rows;i++){
@@ -595,9 +646,12 @@ std::vector< cv::Mat > PD_flow_opencv::projectImagePxTo3D(cv::Mat image, cv::Mat
 			// cv::Mat pixel2D = cv::Mat(3, 1, CV_32F, m).inv();
 			// cv::Mat pixel2D = (cv::Mat_<double>(3,1) << (double)i, (double)j, 1.00);
 
-			double pixel2DArr[3] = { (double)i, (double)j, 1.00 };
-			cv::Mat pixel2D = cv::Mat(3,1, CV_64FC1, pixel2DArr);
+			double pixel2DArr[3] = { (double)j, (double)i, 1.00 };
 
+			cv::Mat pixel2D = cv::Mat(3,1, CV_64FC1);
+
+			for(int i=0; i < 3; i++)
+				pixel2D.at<double>(i,0) = pixel2DArr[i];
 
 			/* 
 			*  Multiply the pixel position matrix [x,y,1] with camera_intrinsic matrix.
@@ -611,7 +665,7 @@ std::vector< cv::Mat > PD_flow_opencv::projectImagePxTo3D(cv::Mat image, cv::Mat
 			// printMatrix(camera_intrinsics);
 			cv::Mat resulting2Dpixel(3,1,CV_64FC1);
 			// resulting2Dpixel = camera_intrinsics.inv() * pixel2D;
-		 	resulting2Dpixel = camera_intrinsics.inv() * pixel2D;
+		 	resulting2Dpixel = inv_cam_intr * pixel2D;
 
 			// cout << " index i,j = "<< i << "," << j<< " ======= depth value =  " << depth_image.at<double>(i,j) << " ====== sum = " <<  resulting2Dpixel * depth_image.at<double>(i,j) <<endl;
 
@@ -619,7 +673,29 @@ std::vector< cv::Mat > PD_flow_opencv::projectImagePxTo3D(cv::Mat image, cv::Mat
 			// cout << "endbreak" << endl;
 			// printMatrix(resulting2Dpixel * depth_image.at<double>(i,j) );
 			/* Adding the depth in the image. pixel 3D should be [x,y,z] i.e 3x1 matrix */
-			pixel3D.push_back(resulting2Dpixel * depth_image.at<double>(i,j));
+
+		 	// cout << " resulting 2d x = " << resulting2Dpixel.at<double>(0,0) << endl;
+		 	// cout << " resulting 2d y = " << resulting2Dpixel.at<double>(1,0) << endl;
+		 	// cout << " resulting 2d z = " << resulting2Dpixel.at<double>(2,0) << endl;
+		 	// cout << " depth pixel " << depth_image.at<double>(i,j) << endl;
+
+		 	cout << "depth intensity = "  << depth_image.at<float>(i,j) << endl;
+
+			pixel3D.push_back(resulting2Dpixel * depth_image.at<float>(i,j));
+
+			// cv::Mat matrix_with_depth = resulting2Dpixel * depth_image.at<double>(i,j);
+
+			// // going back to 2D plane in homogenous coordinates
+			// cv::Mat item = camera_intrinsics * matrix_with_depth;
+
+			// // going back to cartesian coordinates
+			// item.at<double>(0,0) = item.at<double>(0,0) / item.at<double>(2,0);
+			// item.at<double>(1,0) = item.at<double>(1,0) / item.at<double>(2,0);
+			// item.at<double>(2,0) = item.at<double>(2,0) / item.at<double>(2,0);
+
+		 // 	cout << "resulting 2d pixel" << resulting2Dpixel << "  " << j << " "  << i << endl;
+			// cout << "final matrix = " << item << endl;
+
 		}
 	}
 

@@ -116,7 +116,7 @@ public:
     std::vector< cv::Mat > applySceneFlowTo3DWorldPixels(std::vector< cv::Mat > pixel3D);
     std::vector< cv::Mat > projectBackTo2D(std::vector< cv::Mat > pixelWorld3D);
 
-    cv::Mat resizeImage(cv::Mat image);
+    cv::Mat resizeImage(cv::Mat image,int interpolation );
 
     void printMatrix(cv::Mat image);
     void writeTxt(std::vector< cv::Mat > finalPixel2D);

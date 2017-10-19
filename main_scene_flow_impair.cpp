@@ -22,7 +22,7 @@
 *****************************************************************************/
 
 #include "scene_flow_impair.h"
-
+#include "iostream"
 using namespace std;
 
 
@@ -164,6 +164,8 @@ int main(int num_arg, char *argv[])
 							args.depth_filename_1, 
 							args.depth_filename_2, 
 							args.output_filename_root);
+
+
 
 	//Initialize CUDA and set some internal variables 
     // sceneflow.initializeCUDA();
