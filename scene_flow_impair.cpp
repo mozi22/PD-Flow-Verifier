@@ -284,7 +284,7 @@ bool PD_flow_opencv::loadRGBDFrames()
 	std::vector< cv::Mat > pixel3D = projectImagePxTo3D(intensity1,depth1);
 
 	// // now we add sceneflow from file
-	pixel3D = applySceneFlowTo3DWorldPixels(pixel3D);
+	pixel3D = apply_optical_flow_to_img_1(pixel3D);
 
 	// // project the matrix back to 2D.
 	pixel3D = projectBackTo2D(pixel3D);
@@ -414,6 +414,11 @@ bool PD_flow_opencv::loadRGBDFrames()
 // }
 
 
+
+
+
+
+
 // step 4
 void PD_flow_opencv::writeTxt(std::vector< cv::Mat > finalPixel2D){
 
@@ -443,7 +448,50 @@ void PD_flow_opencv::writeTxt(std::vector< cv::Mat > finalPixel2D){
 }
 
 
+std::vector< cv::Mat > PD_flow_opencv::apply_optical_flow_to_img_1(std::vector< cv::Mat > pixel3D){
 
+	int posX, posY;
+	double u,v,w;
+	int i = 0;
+
+	std::ifstream infile("./pdflow_results02.txt");
+	while (infile >> posX >> posY >> u >> v >> w)
+	{
+		cv::Mat item = pixel3D[i];
+
+
+		if(item.at<double>(0,0) != 0 && item.at<double>(1,0) != 0 && item.at<double>(2,0) != 0){
+			// cout << "before sceneflow = matrix = " << pixel3D[i] << endl;
+			// cout << "depth before = " << item.at<double>(2,0) << endl;
+			// cout << "sceneflowX before = " << sceneflowX <<endl;
+			// cout << "sceneflowY before = " << sceneflowY <<endl;
+			// cout << "sceneflowZ before = " << sceneflowZ <<endl;
+	
+		}
+
+		item.at<double>(0,0) = item.at<double>(0,0) + u;
+		item.at<double>(1,0) = item.at<double>(1,0) + v;
+		// item.at<double>(2,0) = item.at<double>(2,0) + sceneflowZ;
+
+
+
+		pixel3D[i] = item;
+
+		if(item.at<double>(0,0) != 0){
+			// cout << "sceneflowX = " << sceneflowX <<endl;
+			// cout << "sceneflowY = " << sceneflowY <<endl;
+			// cout << "sceneflowZ = " << sceneflowZ <<endl;
+	
+			// cout << "depth after = " << item.at<double>(2,0) << endl;
+
+			// cout << "after sceneflow = matrix = " << pixel3D[i] << endl;
+		}
+		i++;
+	}
+
+	return pixel3D;
+
+}
 
 
 
@@ -574,14 +622,11 @@ std::vector< cv::Mat > PD_flow_opencv::applySceneFlowTo3DWorldPixels(std::vector
 			// cout << "sceneflowX before = " << sceneflowX <<endl;
 			// cout << "sceneflowY before = " << sceneflowY <<endl;
 			// cout << "sceneflowZ before = " << sceneflowZ <<endl;
-	
 		}
 
 		item.at<double>(0,0) = item.at<double>(0,0) + sceneflowX;
 		item.at<double>(1,0) = item.at<double>(1,0) + sceneflowY;
 		item.at<double>(2,0) = item.at<double>(2,0) + sceneflowZ;
-
-
 
 		pixel3D[i] = item;
 
@@ -665,6 +710,7 @@ std::vector< cv::Mat > PD_flow_opencv::projectImagePxTo3D(cv::Mat image, cv::Mat
 			// printMatrix(camera_intrinsics);
 			cv::Mat resulting2Dpixel(3,1,CV_64FC1);
 			// resulting2Dpixel = camera_intrinsics.inv() * pixel2D;
+
 		 	resulting2Dpixel = inv_cam_intr * pixel2D;
 
 			// cout << " index i,j = "<< i << "," << j<< " ======= depth value =  " << depth_image.at<double>(i,j) << " ====== sum = " <<  resulting2Dpixel * depth_image.at<double>(i,j) <<endl;
@@ -679,9 +725,10 @@ std::vector< cv::Mat > PD_flow_opencv::projectImagePxTo3D(cv::Mat image, cv::Mat
 		 	// cout << " resulting 2d z = " << resulting2Dpixel.at<double>(2,0) << endl;
 		 	// cout << " depth pixel " << depth_image.at<double>(i,j) << endl;
 
-		 	cout << "depth intensity = "  << depth_image.at<float>(i,j) << endl;
+		 	// cout << "depth intensity = "  << depth_image.at<float>(i,j) << endl;
 
-			pixel3D.push_back(resulting2Dpixel * depth_image.at<float>(i,j));
+			// pixel3D.push_back(resulting2Dpixel * depth_image.at<float>(i,j));
+			pixel3D.push_back(resulting2Dpixel);
 
 			// cv::Mat matrix_with_depth = resulting2Dpixel * depth_image.at<double>(i,j);
 
